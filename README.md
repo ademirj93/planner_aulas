@@ -37,7 +37,7 @@ The following tools were used in this project:
 - [Bootstrap](https://getbootstrap.com/)
 ## :white_check_mark: Requirements ##
 
-Before starting :checkered_flag:, you need to have [Git][Optiona](https://git-scm.com) and [Python](https://www.python.org/) installed.
+Before starting :checkered_flag:, you need to have [Git](https://git-scm.com) and [Python](https://www.python.org/) installed.
 
 ## :checkered_flag: Starting ##
 
