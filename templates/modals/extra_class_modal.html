@@ -1,0 +1,85 @@
+<div class="modal fade" id="modalExtraClass" tabindex="-1" aria-labelledby="modalExtraLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.add_extra') }}" method="POST">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="modalExtraLabel">Agendar Aula Extra</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label for="extraDate" class="form-label">Data</label>
+                            <input type="date" class="form-control" name="date" id="extraDate" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="extraTime" class="form-label">Horário</label>
+                            <input type="time" class="form-control" name="start_time" id="extraTime" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Tipo / Duração</label>
+                        <select name="duration_option" class="form-select" required>
+                            <option value="60">60 min (R$ 30,00)</option>
+                            <option value="40">40 min (R$ 20,00)</option>
+                        </select>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <label class="form-label">Vincular a:</label>
+                        <select name="turma_id" class="form-select" id="selectTurmaExtra" onchange="toggleExtraFields()">
+                            <option value="" selected disabled>Selecione...</option>
+                            {% for t in turmas %}
+                                <option value="{{ t.id }}">{{ t.name }} ({{ t.course.name }})</option>
+                            {% endfor %}
+                            <option value="other" style="font-weight: bold; color: blue;">+ Outra (Avulsa)</option>
+                        </select>
+                    </div>
+
+                    <div id="divOtherName" class="p-3 bg-light border rounded d-none">
+                        <h6 class="text-muted mb-2">Dados da Aula Avulsa</h6>
+                        
+                        <div class="mb-2">
+                            <label class="form-label small">Nome do Aluno / Turma</label>
+                            <input type="text" name="student_name" id="inputStudentName" class="form-control">
+                        </div>
+                        
+                        <div class="mb-2">
+                            <label class="form-label small">Link do Backoffice</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-building"></i></span>
+                                <input type="text" name="link_backoffice" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Confirmar Agendamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleExtraFields() {
+        var select = document.getElementById('selectTurmaExtra');
+        var divOther = document.getElementById('divOtherName');
+        var inputName = document.getElementById('inputStudentName');
+
+        if (select.value === 'other') {
+            divOther.classList.remove('d-none');
+            inputName.setAttribute('required', 'required');
+        } else {
+            divOther.classList.add('d-none');
+            inputName.removeAttribute('required');
+            inputName.value = ''; 
+        }
+    }
+</script>

@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Cursos Ativos</h5>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modalCourse">
+                    + Novo Curso
+                </button>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for course in courses %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ course.name }}</strong>
+                        <small class="text-muted d-block">{{ course.duration_minutes }} min | R$ {{ course.price_per_class }}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" 
+                            onclick="editCourse({{ course.id }}, '{{ course.name }}', {{ course.price_per_class }}, {{ course.duration_minutes }})"
+                            data-bs-toggle="modal" data-bs-target="#modalCourse">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Turmas Ativas</h5>
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#modalClass">
+                    + Nova Turma
+                </button>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for turma in turmas %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>{{ turma.name }}</strong>
+                            <div class="text-muted small">
+                                <span class="badge bg-light text-dark border">{{ turma.start_time }}</span>
+                                {% set days = turma.schedule_days.split(',') %}
+                                {% if '0' in days %}Seg {% endif %}
+                                {% if '1' in days %}Ter {% endif %}
+                                {% if '2' in days %}Qua {% endif %}
+                                {% if '3' in days %}Qui {% endif %}
+                                {% if '4' in days %}Sex {% endif %}
+                                {% if '5' in days %}Sáb {% endif %}
+                                {% if '6' in days %}Dom {% endif %}
+                            </div>
+                            
+                            <div class="mt-2 d-flex gap-2">
+                                {% if turma.link_whatsapp %}
+                                <a href="{{ turma.link_whatsapp | external_url }}" target="_blank" class="text-success text-decoration-none">
+                                    <i class="bi bi-whatsapp"></i> Whats
+                                </a>
+                                {% endif %}
+                                
+                                {% if turma.link_backoffice %}
+                                <a href="{{ turma.link_backoffice | external_url }}" target="_blank" class="text-primary text-decoration-none">
+                                    <i class="bi bi-building"></i> Backoffice
+                                </a>
+                                {% endif %}
+                                
+                                {% if turma.link_extra %}
+                                <a href="{{ turma.link_extra | external_url }}" target="_blank" class="text-info text-decoration-none">
+                                    <i class="bi bi-link-45deg"></i> Extra
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-sm btn-outline-secondary" 
+                                onclick="editClass({{ turma.id }})" 
+                                data-bs-toggle="modal" data-bs-target="#modalClass">
+                            Editar
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'modals/course_modal.html' %}
+{% include 'modals/class_modal.html' %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function editCourse(id, name, price, duration) {
+        document.getElementById('courseId').value = id;
+        document.getElementById('courseName').value = name;
+        document.getElementById('coursePrice').value = price;
+        document.getElementById('courseDuration').value = duration;
+        if(typeof loadLessonsForCourse === 'function') {
+            loadLessonsForCourse(id);
+        }
+    }
+    function editClass(id) {
+        document.getElementById('classId').value = id;
+    }
+
+    function editClass(id) {
+        // 1. Define o ID no campo oculto
+        document.getElementById('classId').value = id;
+
+        // 2. Busca os dados completos da turma via API
+        fetch(`/admin/api/get_class/${id}`)
+            .then(response => response.json())
+            .then(data => {
+                // 3. Preenche os campos de texto/número
+                document.getElementById('className').value = data.name;
+                document.getElementById('startDateInput').value = data.start_date;
+                document.querySelector('input[name="start_time"]').value = data.start_time;
+                document.querySelector('input[name="total_classes"]').value = data.total_classes;
+                
+                // Select de Curso
+                let courseSelect = document.querySelector('select[name="course_id"]');
+                if(courseSelect) courseSelect.value = data.course_id;
+
+                // Links
+                document.querySelector('input[name="link_backoffice"]').value = data.link_backoffice;
+                document.querySelector('input[name="link_whatsapp"]').value = data.link_whatsapp;
+                document.querySelector('input[name="link_extra"]').value = data.link_extra;
+                
+                // Switch Ativo
+                document.getElementById('activeCheck').checked = data.active;
+
+                // 4. Marca os Checkboxes dos Dias da Semana
+                // Primeiro desmarca todos
+                document.querySelectorAll('.day-checkbox').forEach(cb => cb.checked = false);
+                
+                // Depois marca os que vieram do banco
+                if(data.schedule_days && data.schedule_days.length > 0) {
+                    data.schedule_days.forEach(dayValue => {
+                        let checkbox = document.querySelector(`.day-checkbox[value="${dayValue}"]`);
+                        if(checkbox) checkbox.checked = true;
+                    });
+                }
+            })
+            .catch(err => console.error("Erro ao carregar turma:", err));
+    }
+</script>
+{% endblock %}

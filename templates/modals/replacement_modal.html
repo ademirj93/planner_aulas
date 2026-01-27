@@ -1,0 +1,35 @@
+<div class="modal fade" id="modalReplacement" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.add_replacement') }}" method="POST">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Agendar Reposição</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label>Data</label>
+                            <input type="date" name="date" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label>Horário</label>
+                            <input type="time" name="time" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label>Nome do Aluno / Turma</label>
+                        <input type="text" name="student_name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Link da Aula / Backoffice</label>
+                        <input type="text" name="link_backoffice" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Agendar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,17 @@
+body {
+    background-color: #f8f9fa;
+}
+.planner-grid {
+    max-width: 900px;
+    margin: 0 auto;
+}
+.grab-cursor {
+    cursor: grab;
+}
+.grab-cursor:active {
+    cursor: grabbing;
+}
+/* Estilo para links desativados ou cards cancelados */
+.text-decoration-line-through {
+    text-decoration: line-through;
+}

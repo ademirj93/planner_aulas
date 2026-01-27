@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <h2 class="mb-4">Controle Financeiro</h2>
+
+<form class="row g-3 mb-4 bg-white p-3 rounded shadow-sm" method="GET" action="{{ url_for('finance.index') }}">
+        
+        <div class="col-md-2">
+            <label class="form-label">Ano</label>
+            <select name="year" class="form-select">
+                {% for y in range(2024, current_year + 1) %}
+                <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Mês</label>
+            <select name="month" class="form-select">
+                {% set meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'] %}
+                {% for i in range(1, 13) %}
+                <option value="{{ i }}" {% if i == selected_month %}selected{% endif %}>{{ meses[i-1] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Quinzena</label>
+            <select name="period" class="form-select">
+                <option value="all" {% if selected_period == 'all' %}selected{% endif %}>Mês Completo</option>
+                <option value="1" {% if selected_period == '1' %}selected{% endif %}>1ª Quinzena (01-15)</option>
+                <option value="2" {% if selected_period == '2' %}selected{% endif %}>2ª Quinzena (16-Fim)</option>
+            </select>
+        </div>
+
+        <div class="col-md-3 align-self-end">
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-filter"></i> Filtrar
+            </button>
+        </div>
+    </form>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-success h-100">
+                <div class="card-body">
+                    <h5 class="card-title">A Receber (Filtrado)</h5>
+                    <h2 class="display-6">R$ {{ "%.2f"|format(total) }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-dark bg-warning h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Aulas Dadas</h5>
+                    <h3>{{ count_classes }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-info h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Horas Trabalhadas</h5>
+                    <h3>{{ total_hours }}h</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<div class="card mb-4 shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0 text-primary"><i class="bi bi-calendar-check"></i> Previsão de Término (Estimativa)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Turma / Aluno</th>
+                            <th>Progresso</th>
+                            <th>Estimativa Final</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in estimates %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.name }}</strong><br>
+                                <small class="text-muted">{{ item.course }}</small>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <span class="me-2">{{ item.current }} / {{ item.total }}</span>
+                                    <div class="progress flex-grow-1" style="height: 6px; max-width: 100px;">
+                                        {% set percent = (item.current / item.total * 100) | round %}
+                                        <div class="progress-bar" style="width: {{ percent }}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="fw-bold text-success">
+                                {{ item.end_date }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <h4 class="mb-3">Extrato Detalhado</h4>
+
+    <div class="table-responsive bg-white rounded shadow-sm p-3">
+        <table class="table table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Data</th>
+                    <th>Curso/Turma</th>
+                    <th>Duração</th>
+                    <th>Valor</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in history %}
+                <tr class="{% if event.status == 'cancelled' %}table-danger text-muted{% endif %}">
+                    <td>{{ event.date.strftime('%d/%m/%Y') }}</td>
+                    <td>
+                        {# --- CORREÇÃO DA LÓGICA DE EXIBIÇÃO --- #}
+                        
+                        {% if event.is_extra %}
+                            {# Caso seja Aula Extra #}
+                            <span class="badge bg-warning text-dark">Extra</span> 
+                            {{ event.student_name or (event.turma.name if event.turma else 'Avulso') }}
+                        
+                        {% elif event.is_replacement %}
+                            {# Caso seja Reposição (O ERRO OCORRIA AQUI ANTES) #}
+                            <span class="badge bg-success">Reposição</span> {{ event.student_name }}
+                        
+                        {% elif event.turma %}
+                            {# Caso seja Aula Normal com Turma #}
+                            {{ event.turma.course.name }} - {{ event.turma.name }}
+                        
+                        {% else %}
+                            {# Caso de segurança para eventos órfãos #}
+                            <span class="text-muted">Sem vínculo</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ event.duration }} min</td>
+                    <td>R$ {{ "%.2f"|format(event.price) }}</td>
+                    <td>
+                        {% if event.status == 'cancelled' %}Cancelada
+                        {% elif event.status == 'confirmed' %}Confirmada
+                        {% else %}Agendada{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

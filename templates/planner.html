@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+    <div class="row mb-3 align-items-center">
+        <div class="col-md-4">
+            <label class="form-label small fw-bold">Período de Visualização:</label>
+            <form action="{{ url_for('main.planner') }}" method="GET">
+                <select name="date" class="form-select border-primary" onchange="this.form.submit()">
+                    {% for week in weeks_options %}
+                    <option value="{{ week.value }}" {% if week.selected %}selected{% endif %}>
+                        {{ week.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card text-white bg-success h-100 shadow-sm">
+                <div class="card-body p-2 d-flex flex-column justify-content-center text-center">
+                    <h6 class="card-subtitle mb-0 small">Previsto (Semana)</h6>
+                    <h4 class="card-title m-0">R$ {{ "%.2f"|format(total_expected) }}</h4>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-5">
+            <div class="d-flex gap-2 h-100 align-items-end">
+                <button class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#modalHoliday">
+                    <i class="bi bi-calendar-x"></i> Feriado
+                </button>
+                <button class="btn btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#modalReplacement">
+                    <i class="bi bi-arrow-repeat"></i> Reposição
+                </button>
+                <button class="btn btn-primary w-100 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalExtraClass">
+                    <i class="bi bi-plus-circle"></i> Aula Extra
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <div id="plannerEvents">
+        {% if daily_planner|length == 0 %}
+            <div class="alert alert-info">Nenhuma aula agendada para esta semana.</div>
+        {% endif %}
+
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+            {% for day_group in daily_planner %}
+            <div class="col">
+                <div class="card h-100 bg-transparent border-0">
+                    <div class="card-header bg-primary text-white rounded-top shadow-sm py-2">
+                        <h5 class="mb-0 fs-6 fw-bold"><i class="bi bi-calendar-day"></i> {{ day_group.label }}</h5>
+                    </div>
+                    
+                    <div class="card-body p-0 pt-2">
+                        {% for event in day_group.events %}
+                            {% set bg_class = 'bg-white' %}
+                            {% set border_color = '#0d6efd' %} {# Azul Padrão #}
+                            
+                            {% if event.status == 'cancelled' %}
+                                {% set bg_class = 'bg-danger bg-opacity-10' %}
+                            {% elif event.status == 'holiday' %}
+                                {% set bg_class = 'bg-secondary bg-opacity-25' %}
+                                {% set border_color = '#6c757d' %}
+                            {% elif event.is_extra %}
+                                {% set border_color = '#ffc107' %} {# Amarelo Extra #}
+                            {% elif event.is_replacement %}
+                                {% set border_color = '#198754' %} {# Verde Reposição #}
+                            {% endif %}
+
+                        <div class="card mb-2 shadow-sm border-0 {{ bg_class }}"
+                            style="border-left: 5px solid {{ border_color }} !important;">
+
+                            <div class="card-body p-2">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <div>
+                                        <span class="badge bg-light text-dark border me-1">{{ event.start_time }}</span>
+                                        <strong style="font-size: 1em;">
+                                            {% if event.status == 'holiday' %}
+                                                <span class="text-danger">FERIADO</span>
+                                            {% elif event.is_extra %}
+                                                (Extra) {{ event.student_name or event.turma.name }}
+                                            {% elif event.is_replacement %}
+                                                (Rep.) {{ event.student_name }}
+                                            {% else %}
+                                                {{ event.turma.name }}
+                                            {% endif %}
+                                        </strong>
+                                    </div>
+
+                                    <div class="d-flex gap-2">
+                                        {% if event.turma and event.turma.link_whatsapp %}
+                                        <a href="{{ event.turma.link_whatsapp | external_url }}" target="_blank" class="text-success text-decoration-none" title="WhatsApp">
+                                            <i class="bi bi-whatsapp"></i>
+                                        </a>
+                                        {% endif %}
+                                        
+                                        {% if (event.turma and event.turma.link_backoffice) or event.extra_link %}
+                                        <a href="{{ (event.extra_link or event.turma.link_backoffice) | external_url }}" target="_blank" class="text-primary text-decoration-none" title="Backoffice">
+                                            <i class="bi bi-building"></i>
+                                        </a>
+                                        {% endif %}
+                                        
+                                        {% if event.turma and event.turma.link_extra %}
+                                        <a href="{{ event.turma.link_extra | external_url }}" target="_blank" class="text-info text-decoration-none" title="Link Extra">
+                                            <i class="bi bi-link-45deg"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                {% if not event.is_extra and event.turma %}
+                                <div class="small text-muted mb-2 ps-1" style="font-size: 0.85em;">
+                                    
+                                    <div class="mb-1 text-dark d-flex align-items-center gap-2">
+                                        <span><i class="bi bi-book"></i> <strong>{{ lesson_info[event.id]['current'] }}</strong></span>
+                                        
+                                        {% if lesson_info[event.id]['link_p'] %}
+                                        <a href="{{ lesson_info[event.id]['link_p'] | external_url }}" target="_blank" class="text-danger" title="Apresentação" style="font-size: 1.1em;">
+                                            <i class="bi bi-file-earmark-slides"></i>
+                                        </a>
+                                        {% endif %}
+
+                                        {% if lesson_info[event.id]['link_g'] %}
+                                        <a href="{{ lesson_info[event.id]['link_g'] | external_url }}" target="_blank" class="text-secondary" title="Guia de Aula" style="font-size: 1.1em;">
+                                            <i class="bi bi-journal-text"></i>
+                                        </a>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="d-flex justify-content-between border-top pt-1">
+                                        <span title="Próximo Conteúdo"><i class="bi bi-arrow-right-circle"></i> {{ lesson_info[event.id]['next'] }}</span>
+                                        <span title="Próxima Data">Data: <strong>{{ next_dates[event.id] }}</strong></span>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <div class="text-end border-top pt-1 mt-1">
+                                    {% if event.status == 'scheduled' %}
+                                        <a href="{{ url_for('main.toggle_status', event_id=event.id, action='cancel') }}"
+                                           class="btn btn-sm btn-outline-danger py-0 px-2"
+                                           onclick="return confirm('Confirmar cancelamento?');"
+                                           style="font-size: 0.75rem;">Cancelar</a>
+                                    {% elif event.status == 'cancelled' %}
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <a href="{{ url_for('main.toggle_status', event_id=event.id, action='reactivate') }}"
+                                               class="btn btn-sm btn-outline-primary py-0 px-2"
+                                               style="font-size: 0.75rem;">Reativar</a>
+                                            <a href="{{ get_form_url('cancel', {'turma': event.turma.name if event.turma else event.student_name, 'data': event.date}) }}"
+                                                class="btn btn-sm btn-danger py-0 px-2" target="_blank"
+                                                style="font-size: 0.75rem;">Formulário</a>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    {% if event.is_extra and event.status == 'scheduled' %}
+                                    <a href="{{ get_form_url('extra', {'aluno': event.student_name or event.turma.name, 'valor': event.price}) }}"
+                                        class="btn btn-sm btn-success py-0 px-2" target="_blank" style="font-size: 0.75rem;">Confirmar</a>
+                                    {% endif %}
+                                    
+                                    {% if event.is_replacement %}
+                                    <a href="{{ get_form_url('replacement', {'aluno': event.student_name, 'valor': 'Reposição'}) }}" 
+                                    class="btn btn-sm btn-success py-0 px-2" target="_blank" style="font-size: 0.75rem;">Form</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %} </div>
+                </div>
+            </div>
+            {% endfor %} </div>
+    </div>
+</div>
+
+{% include 'modals/extra_class_modal.html' %}
+{% include 'modals/holiday_modal.html' %}
+{% include 'modals/replacement_modal.html' %}
+
+{% endblock %}

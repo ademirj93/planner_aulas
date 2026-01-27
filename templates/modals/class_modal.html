@@ -1,0 +1,129 @@
+<div class="modal fade" id="modalClass" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.save_class') }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title">Gerenciar Turma</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="classId">
+
+                    <div class="mb-3">
+                        <label>Curso Vinculado</label>
+                        <select name="course_id" class="form-select">
+                            {% for c in courses %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Nome da Turma / Aluno</label>
+                        <input type="text" name="name" id="className" class="form-control" required>
+                    </div>
+                    
+                    <div class="row mb-3">
+                         <div class="col-md-4">
+                            <label>Total Aulas</label>
+                            <input type="number" name="total_classes" class="form-control" value="40">
+                        </div>
+                        <div class="col-md-4">
+                            <label>Data Início</label>
+                            <input type="date" name="start_date" id="startDateInput" class="form-control" onchange="autoSelectDay()" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label>Horário</label>
+                            <input type="time" name="start_time" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Dias da Semana (Ativos)</label>
+                        <div class="d-flex gap-2 flex-wrap bg-light p-2 rounded">
+                            <div class="form-check">
+                                <input class="form-check-input day-checkbox" type="checkbox" name="days" value="0" id="seg">
+                                <label class="form-check-label" for="seg">Seg</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input day-checkbox" type="checkbox" name="days" value="1" id="ter">
+                                <label class="form-check-label" for="ter">Ter</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input day-checkbox" type="checkbox" name="days" value="2" id="qua">
+                                <label class="form-check-label" for="qua">Qua</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input day-checkbox" type="checkbox" name="days" value="3" id="qui">
+                                <label class="form-check-label" for="qui">Qui</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input day-checkbox" type="checkbox" name="days" value="4" id="sex">
+                                <label class="form-check-label" for="sex">Sex</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input day-checkbox" type="checkbox" name="days" value="5" id="sab">
+                                <label class="form-check-label" for="sab">Sáb</label>
+                            </div>
+                        </div>
+                        <small class="text-muted">O dia de início é selecionado automaticamente, mas você pode marcar outros.</small>
+                    </div>
+
+                    <hr>
+                    
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="bi bi-building"></i></span>
+                        <input type="text" name="link_backoffice" class="form-control" placeholder="Link Backoffice">
+                    </div>
+                    
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="bi bi-whatsapp"></i></span>
+                        <input type="text" name="link_whatsapp" class="form-control" placeholder="Link WhatsApp">
+                    </div>
+
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                        <input type="text" name="link_extra" class="form-control" placeholder="Link Extra (Miro, etc)">
+                    </div>
+
+                    <div class="form-check form-switch mt-3">
+                        <input class="form-check-input" type="checkbox" name="active" checked id="activeCheck">
+                        <label class="form-check-label" for="activeCheck">Turma Ativa</label>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Salvar Turma</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function autoSelectDay() {
+        var dateInput = document.getElementById('startDateInput');
+        if (dateInput.value) {
+            var date = new Date(dateInput.value);
+            // date.getDay() retorna 0 (Dom) a 6 (Sab). Mas como é UTC vs Local, cuidado.
+            // O input type="date" é yyyy-mm-dd. Ao criar new Date("yyyy-mm-dd"), é UTC.
+            // getUTCDay() é mais seguro para pegar o dia exato da string.
+            var dayOfWeek = date.getUTCDay(); 
+            
+            // Ajuste para seu sistema: Python 0=Seg, JS 0=Dom.
+            // Python: 0=Seg, 1=Ter... 6=Dom
+            // JS getUTCDay: 0=Dom, 1=Seg, 2=Ter... 6=Sab
+            
+            var pythonDay = dayOfWeek - 1;
+            if (pythonDay === -1) pythonDay = 6; // Se for Dom(0), vira 6
+            
+            // Marca o checkbox correspondente
+            var checkboxes = document.querySelectorAll('.day-checkbox');
+            checkboxes.forEach(cb => {
+                if(parseInt(cb.value) === pythonDay) {
+                    cb.checked = true;
+                }
+            });
+        }
+    }
+</script>

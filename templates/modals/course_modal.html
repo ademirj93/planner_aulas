@@ -1,0 +1,137 @@
+<div class="modal fade" id="modalCourse" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{{ url_for('admin.save_course') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title">Gerenciar Curso</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="courseId">
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nome do Curso</label>
+                            <input type="text" class="form-control" name="name" id="courseName" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Duração (min)</label>
+                            <input type="number" class="form-control" name="duration" id="courseDuration" value="60" oninput="calculatePrice()">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Valor (R$)</label>
+                            <input type="number" step="0.01" class="form-control" name="price" id="coursePrice">
+                            <div class="form-text text-muted" style="font-size: 0.75rem;">Sugerido: R$ 0,50/min</div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h6>Aulas / Conteúdo</h6>
+                    <div class="mb-3 p-2 bg-light border rounded">
+                        <label class="form-label small">Importar aulas via arquivo (.txt)</label>
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="lessonsFileInput" name="lessons_file">
+                            <button class="btn btn-outline-secondary" type="button" onclick="uploadLessons()">Carregar</button>
+                        </div>
+                        <small class="text-muted" style="font-size: 0.8em;">Formato: 1. Título da Aula</small>
+                    </div>
+
+                    <ul class="list-group" id="lessonsList"></ul>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" class="btn btn-primary" name="action" value="save">Salvar Curso</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ... (Mantenha calculatePrice) ...
+    function calculatePrice() {
+        var durationInput = document.getElementById('courseDuration');
+        var priceInput = document.getElementById('coursePrice');
+        var duration = parseFloat(durationInput.value);
+        if (!isNaN(duration)) {
+            priceInput.value = (duration * 0.5).toFixed(2);
+        }
+    }
+
+    var currentCourseId = null;
+
+    function loadLessonsForCourse(courseId) {
+        currentCourseId = courseId;
+        fetch(`/admin/api/get_lessons/${courseId}`)
+            .then(response => response.json())
+            .then(data => renderLessons(data));
+    }
+
+    // Função para salvar o link assim que o usuário digita
+    function updateLessonLink(id, field, value) {
+        fetch('/admin/api/update_lesson', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: id, field: field, value: value})
+        });
+    }
+
+    function uploadLessons() {
+        var fileInput = document.getElementById('lessonsFileInput');
+        var file = fileInput.files[0];
+        if(!file || !currentCourseId) {
+            alert("Selecione um arquivo e salve o curso primeiro.");
+            return;
+        }
+        var formData = new FormData();
+        formData.append('lessons_file', file);
+        fetch(`/admin/api/import_lessons/${currentCourseId}`, { method: 'POST', body: formData })
+        .then(response => response.json())
+        .then(data => {
+            if(data.success) { loadLessonsForCourse(currentCourseId); fileInput.value = ''; }
+        });
+    }
+
+    function deleteLesson(lessonId) {
+        if(!confirm("Remover esta aula?")) return;
+        fetch(`/admin/api/delete_lesson/${lessonId}`, { method: 'DELETE' })
+            .then(res => res.json())
+            .then(data => { if(data.success) loadLessonsForCourse(currentCourseId); });
+    }
+
+    function renderLessons(lessons) {
+        var list = document.getElementById('lessonsList');
+        list.innerHTML = '';
+        
+        lessons.forEach(l => {
+            var li = document.createElement('li');
+            li.className = 'list-group-item d-flex justify-content-between align-items-center grab-cursor';
+            
+            // Layout da Linha da Aula com Inputs
+            li.innerHTML = `
+                <div style="flex: 1;">
+                    <div class="fw-bold mb-1"><i class="bi bi-grip-vertical text-muted"></i> ${l.title}</div>
+                    <div class="d-flex gap-2">
+                        <input type="text" class="form-control form-control-sm" 
+                               placeholder="Link Apresentação" 
+                               value="${l.link_p || ''}"
+                               onchange="updateLessonLink(${l.id}, 'link_presentation', this.value)">
+                               
+                        <input type="text" class="form-control form-control-sm" 
+                               placeholder="Link Guia/Manual" 
+                               value="${l.link_g || ''}"
+                               onchange="updateLessonLink(${l.id}, 'link_guide', this.value)">
+                    </div>
+                </div>
+                <div class="ms-2">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteLesson(${l.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `;
+            list.appendChild(li);
+        });
+    }
+</script>
