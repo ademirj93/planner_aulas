@@ -1,4 +1,5 @@
-<h1 align="center">Teacher Class Planner (TCP)</h1>
+<<img width="500" alt="tcp" src="https://github.com/user-attachments/assets/ff41cfea-d2d6-40bc-82e9-930589e66cf5" />
+h1 align="center">Teacher Class Planner (TCP)</h1>
 
 <p align="center">
   <img alt="Github top language" src="https://img.shields.io/github/languages/top/ademirj93/planner_aulas?color=56BEB8">
