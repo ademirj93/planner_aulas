@@ -1,5 +1,5 @@
-<div style="align="center";"
-<<img width="500" alt="tcp" src="https://github.com/user-attachments/assets/ff41cfea-d2d6-40bc-82e9-930589e66cf5" />
+<div align="center>
+<img width="500" alt="tcp" src="https://github.com/user-attachments/assets/ff41cfea-d2d6-40bc-82e9-930589e66cf5" />
 </div>
   <h1 align="center">Teacher Class Planner (TCP)</h1>
 
