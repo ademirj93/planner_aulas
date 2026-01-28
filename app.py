@@ -3,13 +3,17 @@ from extensions import db
 from blueprints.main import main_bp
 from blueprints.admin import admin_bp
 from blueprints.finance import finance_bp
+import os
 
 def create_app():
     app = Flask(__name__)
     
     # Configurações
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    database_path = os.path.join(basedir, 'agenda.db')
+
     app.config['SECRET_KEY'] = 'agenda_controle_senha_hash24' 
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///agenda.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + database_path
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
