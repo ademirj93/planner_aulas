@@ -24,6 +24,7 @@ class Turma(db.Model):
     name = db.Column(db.String(100), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey('course.id'))
     active = db.Column(db.Boolean, default=True)
+    status = db.Column(db.String(20), default='active') # active, graduated, inactive
     
     link_backoffice = db.Column(db.String(500))
     link_whatsapp = db.Column(db.String(500))
@@ -32,8 +33,25 @@ class Turma(db.Model):
     schedule_days = db.Column(db.String(20)) 
     start_time = db.Column(db.String(5))
     start_date = db.Column(db.Date, nullable=True)
+    lesson_offset = db.Column(db.Integer, default=0) # Para começar da aula X
     
     total_classes = db.Column(db.Integer, default=40)
+    
+    students = db.relationship('Student', backref='turma', lazy=True, cascade="all, delete-orphan")
+
+class Student(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    turma_id = db.Column(db.Integer, db.ForeignKey('turma.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(20))
+    active = db.Column(db.Boolean, default=True)
+    notes = db.relationship('StudentNote', backref='student', lazy=True, cascade="all, delete-orphan")
+
+class StudentNote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
+    date = db.Column(db.DateTime, default=datetime.now)
+    content = db.Column(db.Text, nullable=False)
 
 class Holiday(db.Model):
     id = db.Column(db.Integer, primary_key=True)

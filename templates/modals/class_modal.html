@@ -24,17 +24,17 @@
                     </div>
                     
                     <div class="row mb-3">
-                         <div class="col-md-4">
-                            <label>Total Aulas</label>
-                            <input type="number" name="total_classes" class="form-control" value="40">
-                        </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label>Data Início</label>
                             <input type="date" name="start_date" id="startDateInput" class="form-control" onchange="autoSelectDay()" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label>Horário</label>
                             <input type="time" name="start_time" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label>Total Aulas</label>
+                            <input type="number" name="total_classes" class="form-control" value="40">
                         </div>
                     </div>
 
@@ -64,6 +64,10 @@
                             <div class="form-check">
                                 <input class="form-check-input day-checkbox" type="checkbox" name="days" value="5" id="sab">
                                 <label class="form-check-label" for="sab">Sáb</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input day-checkbox" type="checkbox" name="days" value="6" id="dom">
+                                <label class="form-check-label" for="dom">Dom</label>
                             </div>
                         </div>
                         <small class="text-muted">O dia de início é selecionado automaticamente, mas você pode marcar outros.</small>

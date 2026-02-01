@@ -144,6 +144,11 @@
                                            class="btn btn-sm btn-outline-danger py-0 px-2"
                                            onclick="return confirm('Confirmar cancelamento?');"
                                            style="font-size: 0.75rem;">Cancelar</a>
+                                        
+                                        <a href="{{ url_for('main.toggle_status', event_id=event.id, action='replacement') }}" 
+                                           class="btn btn-sm btn-outline-warning py-0 px-2 ms-1"
+                                           onclick="window.open('{{ get_form_url('replacement', {'turma': event.turma.name if event.turma else event.student_name, 'data': event.date}) }}', '_blank');"
+                                           style="font-size: 0.75rem;">Substituição</a>
                                     {% elif event.status == 'cancelled' %}
                                         <div class="d-flex justify-content-end gap-2">
                                             <a href="{{ url_for('main.toggle_status', event_id=event.id, action='reactivate') }}"
@@ -161,8 +166,10 @@
                                     {% endif %}
                                     
                                     {% if event.is_replacement %}
-                                    <a href="{{ get_form_url('replacement', {'aluno': event.student_name, 'valor': 'Reposição'}) }}" 
-                                    class="btn btn-sm btn-success py-0 px-2" target="_blank" style="font-size: 0.75rem;">Form</a>
+                                    <a href="{{ get_form_url('replacement', {'turma': event.turma.name if event.turma else event.student_name, 'data': event.date}) }}" 
+                                    class="btn btn-sm btn-success py-0 px-2" target="_blank" style="font-size: 0.75rem;">Formulário</a>
+                                    <a href="{{ url_for('main.toggle_status', event_id=event.id, action='scheduled') }}"
+                                    class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;">Reassumir</a>
                                     {% endif %}
                                 </div>
                             </div>

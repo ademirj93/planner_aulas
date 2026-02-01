@@ -23,7 +23,9 @@ def calculate_end_date(turma):
         CalendarEvent.is_replacement == False
     ).count()
 
-    remaining = turma.total_classes - valid_count
+    # CORREÇÃO: Considera o offset (aulas puladas ou repetidas) no cálculo de restantes
+    # Se offset for positivo (pulou aulas), faltam menos. Se negativo (repetiu), faltam mais.
+    remaining = turma.total_classes - (valid_count + turma.lesson_offset)
 
     # Se já atingiu o total, a última aula válida é a data final
     if remaining <= 0:
@@ -91,25 +93,32 @@ def index():
     total_hours = round(total_minutes / 60, 2)
 
     # --- NOVO: LÓGICA DAS ESTIMATIVAS DE TÉRMINO ---
-    # Pegamos todas as turmas ativas para calcular
     active_turmas = Turma.query.filter_by(active=True).all()
     estimates = []
     
+    today_date = datetime.today().date() # Pegamos a data de hoje
+
     for t in active_turmas:
         end_date = calculate_end_date(t)
         
-        # Calcula progresso (Aulas Dadas / Total)
+        # CORREÇÃO AQUI:
+        # Adicionamos o filtro (CalendarEvent.date <= today_date)
+        # Isso garante que a barra de progresso mostre apenas o que já aconteceu ou é hoje.
         valid_count = CalendarEvent.query.filter(
             CalendarEvent.turma_id == t.id,
             CalendarEvent.status.notin_(['cancelled', 'holiday']),
             CalendarEvent.is_extra == False,
-            CalendarEvent.is_replacement == False
+            CalendarEvent.is_replacement == False,
+            CalendarEvent.date <= today_date  # <--- O PULO DO GATO
         ).count()
         
+        # Garante que não mostre número negativo se o offset for muito agressivo
+        current_lesson_num = max(0, valid_count + t.lesson_offset)
+
         estimates.append({
             'name': t.name,
             'course': t.course.name,
-            'current': valid_count,
+            'current': current_lesson_num, 
             'total': t.total_classes,
             'end_date': end_date
         })

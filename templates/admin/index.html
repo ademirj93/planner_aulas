@@ -75,11 +75,19 @@
                             </div>
                         </div>
                         
-                        <button class="btn btn-sm btn-outline-secondary" 
-                                onclick="editClass({{ turma.id }})" 
-                                data-bs-toggle="modal" data-bs-target="#modalClass">
-                            Editar
-                        </button>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-secondary" 
+                                    onclick="editClass({{ turma.id }})" 
+                                    data-bs-toggle="modal" data-bs-target="#modalClass" title="Editar Turma">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-info text-white" onclick="openStudentModal({{ turma.id }}, '{{ turma.name }}')" title="Gerenciar Alunos">
+                                <i class="bi bi-people"></i>
+                            </button>
+                            <button class="btn btn-sm btn-warning text-dark" onclick="openAdjustModal({{ turma.id }})" title="Ajustar Progresso">
+                                <i class="bi bi-sliders"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
@@ -90,6 +98,80 @@
 
 {% include 'modals/course_modal.html' %}
 {% include 'modals/class_modal.html' %}
+
+<!-- MODAL DE ALUNOS (Adicionado via código) -->
+<div class="modal fade" id="studentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Gerenciar Alunos - <span id="modalTurmaName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="card mb-3 bg-light">
+                    <div class="card-body p-2">
+                        <div class="input-group">
+                            <input type="text" id="newStudentName" class="form-control" placeholder="Nome">
+                            <input type="text" id="newStudentPhone" class="form-control" placeholder="Telefone">
+                            <button class="btn btn-success" onclick="addStudent()">Add</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="studentsList" class="list-group"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL AJUSTE DE AULA -->
+<div class="modal fade" id="adjustModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">Ajustar Progresso da Turma</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Turma: <strong id="adjustClassName"></strong></p>
+                <p class="small text-muted">
+                    O sistema prevê que a próxima aula será a <strong>Nº <span id="adjustCurrentNext"></span></strong>.
+                </p>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Definir Próxima Aula como:</label>
+                    <div id="adjustSelectContainer" class="d-none">
+                        <select id="adjustLessonSelect" class="form-select"></select>
+                    </div>
+                    <div id="adjustInputContainer" class="d-none">
+                        <input type="number" id="adjustLessonInput" class="form-control" min="1">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="saveAdjustment()">Salvar Ajuste</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE NOTAS -->
+<div class="modal fade" id="notesModal" tabindex="-1" style="z-index: 1060;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fs-6">Histórico: <span id="noteStudentName"></span></h5>
+                <button type="button" class="btn-close" onclick="closeNotesModal()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <textarea id="newNoteContent" class="form-control mb-2" rows="2" placeholder="Nova anotação..."></textarea>
+                    <button class="btn btn-primary btn-sm w-100" onclick="addNote()">Salvar Nota</button>
+                </div>
+                <hr>
+                <div id="notesList" class="small" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
 
@@ -122,6 +204,10 @@
                 document.querySelector('input[name="start_time"]').value = data.start_time;
                 document.querySelector('input[name="total_classes"]').value = data.total_classes;
                 
+                // Preenche o campo de Lição Inicial (se existir no modal)
+                let startLessonInput = document.querySelector('input[name="start_lesson"]');
+                if(startLessonInput) startLessonInput.value = data.start_lesson || 1;
+                
                 // Select de Curso
                 let courseSelect = document.querySelector('select[name="course_id"]');
                 if(courseSelect) courseSelect.value = data.course_id;
@@ -147,6 +233,133 @@
                 }
             })
             .catch(err => console.error("Erro ao carregar turma:", err));
+    }
+
+    // --- SCRIPTS DE ALUNOS ---
+    let currentTurmaId = null;
+    let currentStudentId = null;
+
+    function openStudentModal(turmaId, turmaName) {
+        currentTurmaId = turmaId;
+        document.getElementById('modalTurmaName').innerText = turmaName;
+        document.getElementById('newStudentName').value = '';
+        document.getElementById('newStudentPhone').value = '';
+        loadStudents();
+        new bootstrap.Modal(document.getElementById('studentModal')).show();
+    }
+
+    function loadStudents() {
+        fetch(`/admin/api/get_students/${currentTurmaId}`)
+            .then(r => r.json())
+            .then(data => {
+                const list = document.getElementById('studentsList');
+                list.innerHTML = '';
+                if(data.length === 0) list.innerHTML = '<div class="text-muted p-2">Sem alunos.</div>';
+                data.forEach(s => {
+                    const item = document.createElement('div');
+                    item.className = `list-group-item d-flex justify-content-between align-items-center ${s.active?'':'bg-light text-muted'}`;
+                    item.innerHTML = `
+                        <div>
+                            <div class="fw-bold">${s.name} ${!s.active?'(Inativo)':''}</div>
+                            <div class="small text-muted"><i class="bi bi-telephone"></i> ${s.phone}</div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" onclick='openNotes(${s.id}, "${s.name}", ${JSON.stringify(s.notes)})'>Notas</button>
+                            <button class="btn btn-sm ${s.active?'btn-outline-secondary':'btn-outline-success'}" onclick="toggleStudent(${s.id})">
+                                <i class="bi ${s.active?'bi-person-dash':'bi-person-check'}"></i>
+                            </button>
+                        </div>`;
+                    list.appendChild(item);
+                });
+            });
+    }
+
+    function addStudent() {
+        const name = document.getElementById('newStudentName').value;
+        const phone = document.getElementById('newStudentPhone').value;
+        if(!name) return;
+        fetch('/admin/api/save_student', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({turma_id: currentTurmaId, name: name, phone: phone})
+        }).then(r => r.json()).then(d => { if(d.success) loadStudents(); });
+    }
+
+    function toggleStudent(id) {
+        fetch(`/admin/api/toggle_student/${id}`, {method: 'POST'}).then(() => loadStudents());
+    }
+
+    function openNotes(id, name, notes) {
+        currentStudentId = id;
+        document.getElementById('noteStudentName').innerText = name;
+        renderNotes(notes);
+        new bootstrap.Modal(document.getElementById('notesModal')).show();
+    }
+
+    function renderNotes(notes) {
+        const list = document.getElementById('notesList');
+        list.innerHTML = '';
+        if(!notes || !notes.length) list.innerHTML = '<p class="text-muted">Nenhuma nota.</p>';
+        notes.forEach(n => {
+            list.innerHTML += `<div class="border-bottom mb-2 pb-1"><div class="fw-bold small">${n.date}</div><div>${n.content}</div></div>`;
+        });
+    }
+
+    function addNote() {
+        const content = document.getElementById('newNoteContent').value;
+        if(!content) return;
+        fetch('/admin/api/add_student_note', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({student_id: currentStudentId, content: content})
+        }).then(r => r.json()).then(d => {
+            if(d.success) { document.getElementById('newNoteContent').value=''; closeNotesModal(); loadStudents(); }
+        });
+    }
+    function closeNotesModal() { bootstrap.Modal.getInstance(document.getElementById('notesModal')).hide(); }
+
+    // --- SCRIPTS DE AJUSTE DE AULA ---
+    let adjustClassId = null;
+
+    function openAdjustModal(classId) {
+        adjustClassId = classId;
+        fetch(`/admin/api/get_class_progress/${classId}`)
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('adjustClassName').innerText = data.class_name;
+                document.getElementById('adjustCurrentNext').innerText = data.current_next_lesson;
+                
+                const select = document.getElementById('adjustLessonSelect');
+                const input = document.getElementById('adjustLessonInput');
+                const divSelect = document.getElementById('adjustSelectContainer');
+                const divInput = document.getElementById('adjustInputContainer');
+                
+                if (data.course_lessons && data.course_lessons.length > 0) {
+                    divSelect.classList.remove('d-none');
+                    divInput.classList.add('d-none');
+                    select.innerHTML = '';
+                    data.course_lessons.forEach(l => {
+                        let opt = document.createElement('option');
+                        opt.value = l.order + 1; 
+                        opt.text = `${l.order + 1}. ${l.title}`;
+                        if (l.order + 1 === data.current_next_lesson) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                } else {
+                    divSelect.classList.add('d-none');
+                    divInput.classList.remove('d-none');
+                    input.value = data.current_next_lesson;
+                }
+                new bootstrap.Modal(document.getElementById('adjustModal')).show();
+            });
+    }
+
+    function saveAdjustment() {
+        const divSelect = document.getElementById('adjustSelectContainer');
+        let target = !divSelect.classList.contains('d-none') ? document.getElementById('adjustLessonSelect').value : document.getElementById('adjustLessonInput').value;
+        
+        fetch('/admin/api/adjust_class_progress', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({class_id: adjustClassId, target_lesson: target})
+        }).then(r => r.json()).then(d => { if(d.success) location.reload(); });
     }
 </script>
 {% endblock %}

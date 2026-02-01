@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from extensions import db
-from models import Course, Turma, Lesson, CalendarEvent, Holiday
+from models import Course, Turma, Lesson, CalendarEvent, Holiday, Student, StudentNote
 from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__)
@@ -40,7 +40,7 @@ def save_course():
 def api_update_lesson():
     data = request.json
     lesson_id = data.get('id')
-    field = data.get('field') # 'link_presentation' ou 'link_guide'
+    field = data.get('field') # 'link_presentation', 'link_guide', 'title'
     value = data.get('value')
     
     lesson = Lesson.query.get_or_404(lesson_id)
@@ -49,6 +49,8 @@ def api_update_lesson():
         lesson.link_presentation = value
     elif field == 'link_guide':
         lesson.link_guide = value
+    elif field == 'title':
+        lesson.title = value
         
     db.session.commit()
     return jsonify({'success': True})
@@ -81,6 +83,22 @@ def api_import_lessons(course_id):
         return jsonify({'success': True, 'message': f'{added_count} aulas importadas!', 'course_id': course.id})
     
     return jsonify({'success': False, 'message': 'Arquivo inválido'})
+
+# NOVO: Adicionar aula manualmente
+@admin_bp.route('/api/add_lesson_manual', methods=['POST'])
+def api_add_lesson_manual():
+    data = request.json
+    course_id = data.get('course_id')
+    title = data.get('title')
+    
+    last_lesson = Lesson.query.filter_by(course_id=course_id).order_by(Lesson.order.desc()).first()
+    current_order = last_lesson.order + 1 if last_lesson else 0
+    
+    lesson = Lesson(course_id=course_id, title=title, order=current_order)
+    db.session.add(lesson)
+    db.session.commit()
+    
+    return jsonify({'success': True})
 
 # NOVO: API para buscar as aulas (para atualizar a lista via JS)
 @admin_bp.route('/api/get_lessons/<int:course_id>')
@@ -132,6 +150,10 @@ def save_class():
     
     total = request.form.get('total_classes')
     turma.total_classes = int(total) if total else 40
+    
+    # Novo campo: Começar da aula nº
+    start_lesson = request.form.get('start_lesson')
+    turma.lesson_offset = (int(start_lesson) - 1) if start_lesson and int(start_lesson) > 0 else 0
 
     start_date_str = request.form.get('start_date')
     if start_date_str:
@@ -143,6 +165,9 @@ def save_class():
     turma.link_whatsapp = request.form.get('link_whatsapp')
     turma.link_extra = request.form.get('link_extra')
     turma.active = True if request.form.get('active') else False
+    # Se reativar, volta status
+    if turma.active and turma.status == 'graduated':
+        turma.status = 'active'
 
     db.session.commit()
     flash('Turma salva com sucesso!', 'success')
@@ -231,6 +256,7 @@ def api_get_class(class_id):
         'start_time': turma.start_time,
         'start_date': turma.start_date.strftime('%Y-%m-%d') if turma.start_date else '',
         'total_classes': turma.total_classes,
+        'start_lesson': (turma.lesson_offset + 1) if turma.lesson_offset else 1,
         'active': turma.active,
         # Transforma a string "0,2,4" em lista ["0", "2", "4"]
         'schedule_days': turma.schedule_days.split(',') if turma.schedule_days else [],
@@ -238,3 +264,127 @@ def api_get_class(class_id):
         'link_whatsapp': turma.link_whatsapp or '',
         'link_extra': turma.link_extra or ''
     })
+
+# --- GESTÃO DE ALUNOS ---
+
+@admin_bp.route('/api/save_student', methods=['POST'])
+def api_save_student():
+    data = request.json
+    student_id = data.get('id')
+    turma_id = data.get('turma_id')
+    name = data.get('name')
+    phone = data.get('phone')
+    
+    if student_id:
+        student = Student.query.get_or_404(student_id)
+        student.name = name
+        student.phone = phone
+    else:
+        student = Student(turma_id=turma_id, name=name, phone=phone)
+        db.session.add(student)
+    
+    db.session.commit()
+    return jsonify({'success': True})
+
+@admin_bp.route('/api/get_students/<int:turma_id>')
+def api_get_students(turma_id):
+    students = Student.query.filter_by(turma_id=turma_id).all()
+    result = []
+    for s in students:
+        notes = [{'date': n.date.strftime('%d/%m/%Y'), 'content': n.content} for n in s.notes]
+        result.append({
+            'id': s.id,
+            'name': s.name,
+            'phone': s.phone or '',
+            'active': s.active,
+            'notes': notes
+        })
+    return jsonify(result)
+
+@admin_bp.route('/api/toggle_student/<int:student_id>', methods=['POST'])
+def api_toggle_student(student_id):
+    student = Student.query.get_or_404(student_id)
+    student.active = not student.active
+    db.session.commit()
+    return jsonify({'success': True, 'active': student.active})
+
+@admin_bp.route('/api/add_student_note', methods=['POST'])
+def api_add_student_note():
+    data = request.json
+    student_id = data.get('student_id')
+    content = data.get('content')
+    
+    note = StudentNote(student_id=student_id, content=content)
+    db.session.add(note)
+    db.session.commit()
+    return jsonify({'success': True})
+
+# --- AJUSTE DE PROGRESSO DA TURMA ---
+
+@admin_bp.route('/api/get_class_progress/<int:class_id>')
+def api_get_class_progress(class_id):
+    turma = Turma.query.get_or_404(class_id)
+    
+    # CORREÇÃO: Identifica a "próxima aula" real (hoje ou futuro) para alinhar a contagem
+    next_event = CalendarEvent.query.filter(
+        CalendarEvent.turma_id == turma.id,
+        CalendarEvent.status.notin_(['cancelled', 'holiday']),
+        CalendarEvent.date >= datetime.now().date()
+    ).order_by(CalendarEvent.date).first()
+    
+    # Define a data de corte: se tiver aula futura, conta até antes dela. Se não, conta tudo até hoje.
+    cutoff_date = next_event.date if next_event else datetime.now().date()
+    
+    valid_count = CalendarEvent.query.filter(
+        CalendarEvent.turma_id == turma.id,
+        CalendarEvent.status.notin_(['cancelled', 'holiday']),
+        CalendarEvent.is_extra == False,
+        CalendarEvent.is_replacement == False,
+        CalendarEvent.date < cutoff_date
+    ).count()
+    
+    # Próxima aula calculada (1-based para exibição)
+    current_next_lesson = valid_count + turma.lesson_offset + 1
+    
+    # Busca lições do curso para o dropdown
+    course_lessons = []
+    if turma.course:
+        course_lessons = [{'order': l.order, 'title': l.title} for l in turma.course.lessons]
+        course_lessons.sort(key=lambda x: x['order'])
+        
+    return jsonify({
+        'class_id': turma.id,
+        'class_name': turma.name,
+        'valid_count': valid_count,
+        'current_next_lesson': current_next_lesson,
+        'course_lessons': course_lessons
+    })
+
+@admin_bp.route('/api/adjust_class_progress', methods=['POST'])
+def api_adjust_class_progress():
+    data = request.json
+    turma = Turma.query.get_or_404(data.get('class_id'))
+    target_lesson = int(data.get('target_lesson')) # Número da aula que o usuário QUER (1-based)
+    
+    # CORREÇÃO: Mesma lógica do GET para garantir consistência
+    next_event = CalendarEvent.query.filter(
+        CalendarEvent.turma_id == turma.id,
+        CalendarEvent.status.notin_(['cancelled', 'holiday']),
+        CalendarEvent.date >= datetime.now().date()
+    ).order_by(CalendarEvent.date).first()
+    
+    cutoff_date = next_event.date if next_event else datetime.now().date()
+    
+    valid_count = CalendarEvent.query.filter(
+        CalendarEvent.turma_id == turma.id,
+        CalendarEvent.status.notin_(['cancelled', 'holiday']),
+        CalendarEvent.is_extra == False,
+        CalendarEvent.is_replacement == False,
+        CalendarEvent.date < cutoff_date
+    ).count()
+    
+    # Fórmula: target = valid + offset + 1  =>  offset = target - valid - 1
+    turma.lesson_offset = target_lesson - valid_count - 1
+    db.session.commit()
+    
+    return jsonify({'success': True})
