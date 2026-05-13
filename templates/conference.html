@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12 d-flex justify-content-between align-items-center">
+        <h2>Conferência de Pagamentos</h2>
+        <a href="{{ url_for('finance.index') }}" class="btn btn-outline-secondary">Voltar para Financeiro</a>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body bg-light">
+        <form method="GET" action="{{ url_for('finance.conference') }}" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Mês</label>
+                <select name="month" class="form-select">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>
+                        {{ "%02d"|format(m) }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Ano</label>
+                <select name="year" class="form-select">
+                    {% for y in range(current_year - 1, current_year + 2) %}
+                    <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Quinzena</label>
+                <select name="period" class="form-select">
+                    <option value="1" {% if selected_period == '1' %}selected{% endif %}>1ª Quinzena (1 a 15)</option>
+                    <option value="2" {% if selected_period == '2' %}selected{% endif %}>2ª Quinzena (16 ao fim)</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Pendentes -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100 border-warning">
+            <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Aulas Pendentes (A Receber)</h5>
+                <span class="badge bg-dark fs-6">R$ {{ "%.2f"|format(total_pending) }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Data</th>
+                                <th>Turma/Aluno</th>
+                                <th>Valor</th>
+                                <th class="text-end">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in pending_events %}
+                            <tr id="row-{{ event.id }}">
+                                <td>{{ event.date.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if event.turma %}
+                                        {{ event.turma.name }}
+                                    {% else %}
+                                        Avulso/Extra: {{ event.student_name }}
+                                    {% endif %}
+                                    {% if event.is_extra %} <span class="badge bg-info text-dark">Extra</span> {% endif %}
+                                    {% if event.is_replacement %} <span class="badge bg-secondary">Reposição</span> {% endif %}
+                                </td>
+                                <td>R$ {{ "%.2f"|format(event.price or 0.0) }}</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-success toggle-btn" onclick="togglePayment({{ event.id }})" title="Confirmar Pagamento">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">Nenhuma aula pendente até este período.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% if pending_events %}
+            <div class="card-footer bg-white text-end">
+                <button class="btn btn-outline-success" onclick="confirmAll()">
+                    <i class="bi bi-check-all"></i> Confirmar Tudo
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Confirmados -->
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100 border-success">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Confirmadas (Nesta Quinzena)</h5>
+                <span class="badge bg-light text-success fs-6">R$ {{ "%.2f"|format(total_confirmed) }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Data</th>
+                                <th>Turma/Aluno</th>
+                                <th>Valor</th>
+                                <th class="text-end">Desfazer</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in confirmed_events %}
+                            <tr id="row-{{ event.id }}">
+                                <td>{{ event.date.strftime('%d/%m/%Y') }}</td>
+                                <td>
+                                    {% if event.turma %}
+                                        {{ event.turma.name }}
+                                    {% else %}
+                                        Avulso/Extra: {{ event.student_name }}
+                                    {% endif %}
+                                </td>
+                                <td>R$ {{ "%.2f"|format(event.price or 0.0) }}</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-danger toggle-btn" onclick="togglePayment({{ event.id }})" title="Desfazer Confirmação">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">Nenhuma aula confirmada neste período.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function togglePayment(eventId) {
+        fetch(`/finance/api/toggle_payment/${eventId}`, {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+
+    function confirmAll() {
+        const pendingIds = [
+            {% for event in pending_events %} {{ event.id }}, {% endfor %}
+        ];
+        
+        if (pendingIds.length > 0 && confirm('Confirmar o pagamento de todas as aulas pendentes da lista?')) {
+            fetch('/finance/api/confirm_all_payments', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({event_ids: pendingIds})
+            })
+            .then(r => r.json())
+            .then(d => { if(d.success) location.reload(); });
+        }
+    }
+</script>
+{% endblock %}

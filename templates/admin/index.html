@@ -17,11 +17,25 @@
                         <strong>{{ course.name }}</strong>
                         <small class="text-muted d-block">{{ course.duration_minutes }} min | R$ {{ course.price_per_class }}</small>
                     </div>
-                    <button class="btn btn-sm btn-outline-secondary" 
-                            onclick="editCourse({{ course.id }}, '{{ course.name }}', {{ course.price_per_class }}, {{ course.duration_minutes }})"
-                            data-bs-toggle="modal" data-bs-target="#modalCourse">
-                        <i class="bi bi-pencil"></i>
-                    </button>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-secondary" 
+                                onclick="editCourse({{ course.id }}, '{{ course.name }}', {{ course.price_per_class }}, {{ course.duration_minutes }})"
+                                data-bs-toggle="modal" data-bs-target="#modalCourse" title="Editar Curso">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" 
+                                onclick="openImportRawModal({{ course.id }})" title="Extrair Aulas de Texto">
+                            <i class="bi bi-file-earmark-text"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" 
+                                onclick="openExportRawModal({{ course.id }}, '{{ course.name | e }}')" title="Exportar Aulas em Texto">
+                            <i class="bi bi-box-arrow-up-right"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" 
+                                onclick="deleteAllLessons({{ course.id }}, '{{ course.name | e }}')" title="Apagar Todas as Aulas">
+                            <i class="bi bi-trash3"></i>
+                        </button>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -168,6 +182,49 @@
                 </div>
                 <hr>
                 <div id="notesList" class="small" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL IMPORTAÇÃO DE AULAS POR TEXTO -->
+<div class="modal fade" id="modalImportRaw" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Extrator de Aulas</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="importRawCourseId">
+                <p class="small text-muted mb-2">Cole os dados copiados da plataforma. O sistema irá extrair automaticamente a segunda linha de cada bloco (logo após o número da aula).</p>
+                <textarea id="rawLessonsText" class="form-control" rows="12" placeholder="Ex:&#10;1&#10;M1L1. Bases do Scratch...&#10;Nome do Professor&#10;2024-09-02 19:00&#10;Se&#10;Gravações da aula"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="processRawImport()">Extrair e Importar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EXPORTAÇÃO DE AULAS POR TEXTO -->
+<div class="modal fade" id="modalExportRaw" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Exportar Aulas de <span id="exportCourseName"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">O texto abaixo está formatado e pronto para ser copiado e importado em outro curso.</p>
+                <textarea id="rawExportText" class="form-control" rows="12" readonly></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="copyExportText()">
+                    <i class="bi bi-clipboard"></i> Copiar para Área de Transferência
+                </button>
             </div>
         </div>
     </div>
@@ -360,6 +417,79 @@
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({class_id: adjustClassId, target_lesson: target})
         }).then(r => r.json()).then(d => { if(d.success) location.reload(); });
+    }
+
+    // --- SCRIPTS DE EXTRAÇÃO DE TEXTO ---
+    function openImportRawModal(courseId) {
+        document.getElementById('importRawCourseId').value = courseId;
+        document.getElementById('rawLessonsText').value = '';
+        new bootstrap.Modal(document.getElementById('modalImportRaw')).show();
+    }
+
+    function processRawImport() {
+        const courseId = document.getElementById('importRawCourseId').value;
+        const textContent = document.getElementById('rawLessonsText').value;
+        
+        if (!textContent.trim()) return alert("Cole o texto primeiro!");
+        
+        fetch(`/admin/api/import_lessons_raw/${courseId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ raw_text: textContent })
+        }).then(r => r.json()).then(d => {
+            if (d.success) { alert(d.message); location.reload(); } else { alert(d.message); }
+        });
+    }
+
+    // --- SCRIPT PARA APAGAR TODAS AS AULAS DE UM CURSO ---
+    function deleteAllLessons(courseId, courseName) {
+        if (confirm(`Tem certeza que deseja apagar TODAS as aulas do curso "${courseName}"?\n\nEsta ação não pode ser desfeita.`)) {
+            fetch(`/admin/api/delete_all_lessons/${courseId}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Ocorreu um erro: ' + data.message);
+                }
+            })
+            .catch(error => alert('Erro de comunicação ao tentar apagar as aulas.'));
+        }
+    }
+
+    // --- SCRIPT PARA EXPORTAR AULAS EM TEXTO ---
+    function openExportRawModal(courseId, courseName) {
+        document.getElementById('exportCourseName').innerText = courseName;
+        
+        fetch(`/admin/api/export_lessons_raw/${courseId}`)
+            .then(response => response.json())
+            .then(data => {
+                const textArea = document.getElementById('rawExportText');
+                if (data.success) {
+                    textArea.value = data.raw_text;
+                    new bootstrap.Modal(document.getElementById('modalExportRaw')).show();
+                } else {
+                    alert(data.message || 'Ocorreu um erro ao exportar as aulas.');
+                }
+            })
+            .catch(error => alert('Erro de comunicação ao tentar exportar as aulas.'));
+    }
+
+    function copyExportText() {
+        const textArea = document.getElementById('rawExportText');
+        navigator.clipboard.writeText(textArea.value).then(() => {
+            const copyButton = document.querySelector('#modalExportRaw .btn-primary');
+            const originalText = copyButton.innerHTML;
+            copyButton.innerHTML = '<i class="bi bi-check-lg"></i> Copiado!';
+            setTimeout(() => {
+                copyButton.innerHTML = originalText;
+            }, 2000);
+        }).catch(err => {
+            alert('Falha ao copiar texto. Por favor, copie manualmente.');
+        });
     }
 </script>
 {% endblock %}

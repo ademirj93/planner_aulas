@@ -72,6 +72,9 @@ class CalendarEvent(db.Model):
     
     # NOVO: Para controlar a reativação de 30min
     cancelled_at = db.Column(db.DateTime, nullable=True)
+    
+    # NOVO: Conferência de pagamento
+    is_paid = db.Column(db.Boolean, default=False)
 
     is_extra = db.Column(db.Boolean, default=False)
     is_replacement = db.Column(db.Boolean, default=False) 

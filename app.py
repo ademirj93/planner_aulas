@@ -37,6 +37,13 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        
+        # Verifica e atualiza a estrutura do banco de dados automaticamente
+        try:
+            from update_db import update_database
+            update_database(app)
+        except Exception as e:
+            print(f"Erro ao verificar atualizações do banco: {e}")
 
     return app
 

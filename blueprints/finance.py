@@ -1,8 +1,9 @@
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, jsonify
 from extensions import db
 from models import CalendarEvent, Turma, Holiday
 from sqlalchemy import func
 from datetime import datetime, timedelta
+from calendar import monthrange
 
 finance_bp = Blueprint('finance', __name__)
 
@@ -133,3 +134,66 @@ def index():
                            selected_period=period,
                            current_year=current_year,
                            estimates=estimates) # <--- Enviando nova lista
+
+# --- NOVO: ÁREA DE CONFERÊNCIA DE PAGAMENTOS ---
+@finance_bp.route('/conference')
+def conference():
+    today = datetime.today()
+    current_year = today.year
+    selected_month = request.args.get('month', today.month, type=int)
+    selected_year = request.args.get('year', today.year, type=int)
+    period = request.args.get('period', '1') 
+    
+    start_date = datetime(selected_year, selected_month, 1).date()
+    if period == '1':
+        end_date = datetime(selected_year, selected_month, 15).date()
+    else:
+        last_day = monthrange(selected_year, selected_month)[1]
+        start_date = datetime(selected_year, selected_month, 16).date()
+        end_date = datetime(selected_year, selected_month, last_day).date()
+        
+    # Pendentes: todas as aulas não pagas (não canceladas/feriado) até a data final do período
+    pending_events = CalendarEvent.query.filter(
+        CalendarEvent.status.notin_(['cancelled', 'holiday']),
+        CalendarEvent.is_paid == False,
+        CalendarEvent.date <= end_date
+    ).order_by(CalendarEvent.date).all()
+    
+    # Confirmadas neste período: pagas e com data dentro do período atual
+    confirmed_events = CalendarEvent.query.filter(
+        CalendarEvent.status.notin_(['cancelled', 'holiday']),
+        CalendarEvent.is_paid == True,
+        CalendarEvent.date >= start_date,
+        CalendarEvent.date <= end_date
+    ).order_by(CalendarEvent.date).all()
+    
+    total_pending = sum((e.price or 0.0) for e in pending_events)
+    total_confirmed = sum((e.price or 0.0) for e in confirmed_events)
+    
+    return render_template('conference.html',
+                           pending_events=pending_events,
+                           confirmed_events=confirmed_events,
+                           total_pending=total_pending,
+                           total_confirmed=total_confirmed,
+                           selected_month=selected_month,
+                           selected_year=selected_year,
+                           selected_period=period,
+                           current_year=current_year)
+
+@finance_bp.route('/api/toggle_payment/<int:event_id>', methods=['POST'])
+def api_toggle_payment(event_id):
+    event = CalendarEvent.query.get_or_404(event_id)
+    event.is_paid = not event.is_paid
+    db.session.commit()
+    return jsonify({'success': True, 'is_paid': event.is_paid})
+
+@finance_bp.route('/api/confirm_all_payments', methods=['POST'])
+def api_confirm_all_payments():
+    data = request.json
+    event_ids = data.get('event_ids', [])
+    if event_ids:
+        events = CalendarEvent.query.filter(CalendarEvent.id.in_(event_ids)).all()
+        for event in events:
+            event.is_paid = True
+        db.session.commit()
+    return jsonify({'success': True})

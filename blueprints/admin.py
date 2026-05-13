@@ -84,6 +84,38 @@ def api_import_lessons(course_id):
     
     return jsonify({'success': False, 'message': 'Arquivo inválido'})
 
+# NOVO: Importar aulas colando o texto (Extrator automático)
+@admin_bp.route('/api/import_lessons_raw/<int:course_id>', methods=['POST'])
+def api_import_lessons_raw(course_id):
+    course = Course.query.get_or_404(course_id)
+    data = request.json
+    content = data.get('raw_text', '')
+    
+    # Divide o texto em linhas, removendo espaços e ignorando linhas totalmente vazias
+    lines = [line.strip() for line in content.split('\n') if line.strip()]
+    
+    titles = []
+    # Percorre procurando linhas compostas unicamente por números (índice da aula)
+    for i, line in enumerate(lines):
+        if line.isdigit():
+            # A linha imediatamente abaixo será assumida como o título da aula
+            if i + 1 < len(lines):
+                titles.append(lines[i+1])
+                
+    if not titles:
+        return jsonify({'success': False, 'message': 'Nenhuma aula (padrão numérico) encontrada no texto.'})
+
+    last_lesson = Lesson.query.filter_by(course_id=course_id).order_by(Lesson.order.desc()).first()
+    current_order = last_lesson.order + 1 if last_lesson else 0
+    
+    for title in titles:
+        lesson = Lesson(course_id=course.id, title=title, order=current_order)
+        db.session.add(lesson)
+        current_order += 1
+        
+    db.session.commit()
+    return jsonify({'success': True, 'message': f'{len(titles)} aulas extraídas e importadas com sucesso!', 'course_id': course.id})
+
 # NOVO: Adicionar aula manualmente
 @admin_bp.route('/api/add_lesson_manual', methods=['POST'])
 def api_add_lesson_manual():
@@ -130,6 +162,43 @@ def api_delete_lesson(lesson_id):
     db.session.delete(lesson)
     db.session.commit()
     return jsonify({'success': True})
+
+# NOVO: API para apagar todas as aulas de um curso
+@admin_bp.route('/api/delete_all_lessons/<int:course_id>', methods=['DELETE'])
+def api_delete_all_lessons(course_id):
+    course = Course.query.get_or_404(course_id)
+    try:
+        # Usamos .delete() que é otimizado para apagar múltiplos registros
+        num_deleted = Lesson.query.filter_by(course_id=course_id).delete()
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'{num_deleted} aulas foram apagadas com sucesso.'})
+    except Exception as e:
+        db.session.rollback()
+        # Retorna um erro 500 para indicar que algo falhou no servidor
+        return jsonify({'success': False, 'message': f'Erro ao apagar aulas: {str(e)}'}), 500
+
+# NOVO: API para exportar aulas no formato de texto
+@admin_bp.route('/api/export_lessons_raw/<int:course_id>')
+def api_export_lessons_raw(course_id):
+    course = Course.query.get_or_404(course_id)
+    # Garante que as aulas estão ordenadas corretamente para a numeração sequencial
+    lessons = Lesson.query.filter_by(course_id=course_id).order_by(Lesson.order).all()
+
+    if not lessons:
+        return jsonify({'success': False, 'message': 'Este curso não tem aulas para exportar.'})
+
+    output_lines = []
+    for i, lesson in enumerate(lessons, 1): # Começa a contagem do 1
+        output_lines.append(str(i))
+        output_lines.append(lesson.title)
+        # Placeholders para manter o formato de 6 linhas que o usuário espera
+        output_lines.append("Professor(a)") 
+        output_lines.append("YYYY-MM-DD HH:MM")
+        output_lines.append("Dia")
+        output_lines.append("Gravações da aula")
+        output_lines.append("") # Linha em branco entre os blocos
+
+    return jsonify({'success': True, 'raw_text': "\n".join(output_lines)})
 
 # --- MANTENHA AS OUTRAS ROTAS (save_class, add_holiday, etc) IGUAIS ---
 # (Copie as rotas save_class, add_holiday, delete_holiday, add_replacement, add_extra do seu arquivo anterior)
